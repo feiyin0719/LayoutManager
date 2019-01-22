@@ -1,0 +1,2 @@
+# LayoutManager
+自定义recyclerview gridlayoutmanager，实现列数切换动画，仿三星gallery
