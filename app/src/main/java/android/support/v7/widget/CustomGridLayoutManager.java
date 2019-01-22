@@ -12,7 +12,7 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     private static final String TAG = "CustomGridLayoutManager";
 
-    public static final int MAX_SPAN_CHANGE_PROCESS = 500;
+    public static final int MAX_SPAN_CHANGE_PROCESS = 50;
     private SparseArray<Rect> itemRects = new SparseArray<>();
     private int mSpanCount;
     private int mToSpanCount;
@@ -22,6 +22,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     int[] mToCachedBorders;
     int mSpanChangeProcess;
     float mOffsetDelta;
+    private int initOffset;
 
     public boolean isSpanChangeMode() {
         return isSpanChangeMode;
@@ -67,37 +68,47 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
         return mSpanChangeProcess;
     }
 
-    public void incChangeProcess() {
+    public  void incChangeProcess() {
+        if (!isSpanChangeMode) {
+            Log.i(TAG, "must call in spanCountChange mode");
+            return;
+        }
         this.mSpanChangeProcess++;
         Log.d(TAG, "spanChangeProcess:" + mSpanChangeProcess);
         updateSpanChangeProcess();
     }
 
-    public void reduceChangeProcess() {
-        this.mSpanChangeProcess--;
-        updateSpanChangeProcess();
-    }
-
-    private void updateSpanChangeProcess() {
+    public  void reduceChangeProcess() {
         if (!isSpanChangeMode) {
             Log.i(TAG, "must call in spanCountChange mode");
             return;
         }
+        this.mSpanChangeProcess--;
+        updateSpanChangeProcess();
+    }
 
+    private  void updateSpanChangeProcess() {
+        if (!isSpanChangeMode) {
+            Log.i(TAG, "must call in spanCountChange mode");
+            return;
+        }
+        Log.d(TAG, "mSpanChangeProcess:"+this.mSpanChangeProcess);
         if (this.mSpanChangeProcess == MAX_SPAN_CHANGE_PROCESS) {
             mSpanCount += 2;
             mCachedBorders = null;
             mToCachedBorders = null;
+            verticalScrollOffset = (int) (initOffset+ mOffsetDelta*Math.abs(mSpanChangeProcess));
             mSpanChangeProcess = 0;
-            verticalScrollOffset += mOffsetDelta;
             isSpanChangeMode = false;
+            Log.d(TAG, "verticalScrollOffset:" + verticalScrollOffset);
             calculateChildrenSite();
         } else if (this.mSpanChangeProcess == -MAX_SPAN_CHANGE_PROCESS) {
             mSpanCount -= 2;
             mCachedBorders = null;
             mToCachedBorders = null;
+            verticalScrollOffset = (int) (initOffset+ mOffsetDelta*Math.abs(mSpanChangeProcess));
             mSpanChangeProcess = 0;
-            verticalScrollOffset += mOffsetDelta;
+
             isSpanChangeMode = false;
             calculateChildrenSite();
         } else {
@@ -109,6 +120,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             if (mSpanChangeProcess == 0)
                 mToCachedBorders = null;
             if (mToCachedBorders == null) {
+                initOffset=verticalScrollOffset;
                 if (mSpanChangeProcess > 0)
                     mToSpanCount = mSpanCount + 2;
                 else if (mSpanChangeProcess < 0)
@@ -119,6 +131,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                 mToCachedBorders = calculateItemBorders(mToCachedBorders, mToSpanCount, totalSpace);
                 //当发生偏移的时候，因为itemSize发生变化，为了显示当前画面，需要更新滑动距离
                 if (mSpanChangeProcess > 0) {
+                    Log.d(TAG, "mSpanChangeProcess > 0");
                     if (verticalScrollOffset > 0) {
                         int width = getItemSize(mCachedBorders, mSpanCount);
                         int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
@@ -128,46 +141,60 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                             newTotalHeight += toWidth;
                         int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
                         if (verticalScrollOffset < newTotalHeight - pheight || newTotalHeight < pheight) {
-                            int col = verticalScrollOffset / width;
-                            if (verticalScrollOffset % width != 0)
-                                ++col;
-                            pheight /= 2;
-                            col += (pheight / width);
-                            if (pheight % width != 0)
-                                ++col;
-                            int toOffset = col * toWidth - pheight;
-                            mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+                            if (newTotalHeight < pheight) {
+                                Log.d(TAG, "newTotalHeight < pheight");
+                                mOffsetDelta = (0.0f - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+
+                            } else {
+                                Log.d(TAG, "verticalScrollOffset < newTotalHeight - pheight");
+                                int col = (int)verticalScrollOffset / width;
+                                if (verticalScrollOffset % width != 0)
+                                    ++col;
+                                pheight /= 2;
+                                col += (pheight / width);
+                                if (pheight % width != 0)
+                                    ++col;
+                                int toOffset = col * toWidth - pheight;
+
+                                mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+                            }
                         } else {
+                            Log.d(TAG, "other");
                             mOffsetDelta = (1.0f * newTotalHeight - pheight - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
                         }
                     } else {
+                        Log.d(TAG, "0");
                         mOffsetDelta = 0;
                     }
                 } else if (mSpanChangeProcess < 0) {
-                   {
-                        int width = getItemSize(mCachedBorders, mSpanCount);
-                        int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
-                        int count = getItemCount();
-                        int newTotalHeight = count / mToSpanCount * toWidth;
-                        if (count % mToSpanCount != 0)
-                            newTotalHeight += toWidth;
-                        int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
-                        int col = verticalScrollOffset / width;
-                        if (verticalScrollOffset % width != 0)
-                            ++col;
-                        pheight /= 2;
-                        col += (pheight / width);
-                        if (pheight % width != 0)
-                            ++col;
-                        int toOffset = col * toWidth - pheight;
-                        mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
 
-                    }
+                    Log.d(TAG, "mSpanChangeProcess < 0");
+
+                    int width = getItemSize(mCachedBorders, mSpanCount);
+                    int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
+                    int count = getItemCount();
+                    int newTotalHeight = count / mToSpanCount * toWidth;
+                    if (count % mToSpanCount != 0)
+                        newTotalHeight += toWidth;
+                    int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
+                    int col =(int) verticalScrollOffset / width;
+                    if (verticalScrollOffset % width != 0)
+                        ++col;
+                    pheight /= 2;
+                    col += (pheight / width);
+                    if (pheight % width != 0)
+                        ++col;
+                    int toOffset = col * toWidth - pheight;
+                    mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+
 
                 }
+                Log.d(TAG, "mOffsetDelta : "+mOffsetDelta);
             }
-            verticalScrollOffset += mOffsetDelta;
 
+            //offsetChildrenVertical((int)(verticalScrollOffset+mOffsetDelta-verticalScrollOffset));
+            verticalScrollOffset = (int) (initOffset+ mOffsetDelta*Math.abs(mSpanChangeProcess));
+            Log.d(TAG, "verticalScrollOffset : "+verticalScrollOffset);
         }
         this.requestLayout();
     }
@@ -181,14 +208,14 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
         if (isSpanChangeMode && mSpanChangeProcess != 0) {
             if (spanChangeAnim != null && spanChangeAnim.isRunning()) return;
             int toProcess = 0;
-            if (mSpanChangeProcess > MAX_SPAN_CHANGE_PROCESS/100*24) {
+            if (mSpanChangeProcess > MAX_SPAN_CHANGE_PROCESS / 50 *12) {
                 toProcess = MAX_SPAN_CHANGE_PROCESS;
-            } else if (mSpanChangeProcess < - MAX_SPAN_CHANGE_PROCESS/100*24) {
+            } else if (mSpanChangeProcess < - MAX_SPAN_CHANGE_PROCESS / 50 *12) {
                 toProcess = -MAX_SPAN_CHANGE_PROCESS;
 
             }
             spanChangeAnim = ObjectAnimator.ofInt(this, "spanChangeProcess", mSpanChangeProcess, toProcess);
-            spanChangeAnim.setDuration(10/(MAX_SPAN_CHANGE_PROCESS/100)* Math.abs(mSpanChangeProcess - toProcess));
+            spanChangeAnim.setDuration(20 / (MAX_SPAN_CHANGE_PROCESS / 50) * Math.abs(mSpanChangeProcess - toProcess));
             spanChangeAnim.setInterpolator(new AccelerateDecelerateInterpolator());
             spanChangeAnim.start();
             spanChangeAnim.addListener(spanChangeListener);
@@ -274,6 +301,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
 
         }
         totalHeight += totalSpace;
+        Log.d(TAG, "totalHeight:" + totalHeight);
     }
 
     private void measureChildWithDecorationsAndMargin(View child, int widthSpec, int heightSpec, boolean alreadyMeasured) {
@@ -294,8 +322,8 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             return;
         }
         // 当前scroll offset状态下的显示区域
-        Rect displayRect = new Rect(0, verticalScrollOffset, getHorizontalSpace(),
-                verticalScrollOffset + getVerticalSpace());
+        Rect displayRect = new Rect(0, (int)verticalScrollOffset, getHorizontalSpace(),
+                (int)verticalScrollOffset + getVerticalSpace());
         int left, top, width, toWidth = 0;
         width = getItemSize(mCachedBorders, mSpanCount);
         if (mSpanChangeProcess != 0)
@@ -345,9 +373,9 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
 
                 layoutDecoratedWithMargins(itemView,
                         childRect.left,
-                        childRect.top - verticalScrollOffset,
+                        childRect.top - (int)verticalScrollOffset,
                         childRect.right,
-                        childRect.bottom - verticalScrollOffset);
+                        childRect.bottom - (int)verticalScrollOffset);
             }
         }
         Log.e(TAG, "itemCount = " + getChildCount());
@@ -364,17 +392,17 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerView.State state) {
         detachAndScrapAttachedViews(recycler);
         //不满一屏无法滚动
+        Log.d(TAG, "totalHeight" + totalHeight + " dy:" + dy + " height:" + getVerticalSpace() + " verticalScrollOffset:" + verticalScrollOffset);
         if (totalHeight < getVerticalSpace()) {
             recycleAndFillView(recycler, state);
             return 0;
         }
         int travel = dy;
 
-        Log.e(TAG, "dy = " + dy);
         if (verticalScrollOffset + dy < 0) {
-            travel = -verticalScrollOffset;
+            travel = -(int)verticalScrollOffset;
         } else if (verticalScrollOffset + dy > totalHeight - getVerticalSpace()) {
-            travel = totalHeight - getVerticalSpace() - verticalScrollOffset;
+            travel = totalHeight - getVerticalSpace() - (int)verticalScrollOffset;
         }
         verticalScrollOffset += travel;
         offsetChildrenVertical(-travel);

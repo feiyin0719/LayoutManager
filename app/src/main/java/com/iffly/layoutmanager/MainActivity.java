@@ -77,10 +77,10 @@ public class MainActivity extends AppCompatActivity {
                     public void run(){
                         int i=0;
                         gridLayoutManager.startSpanChange();
-                        while(i<=150){
+                        while(i<=24){
                             ++i;
                             try {
-                                Thread.sleep(2);
+                                Thread.sleep(30);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
