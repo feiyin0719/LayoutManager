@@ -150,13 +150,12 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                             int col = (int) verticalScrollOffset / width;
                             if (verticalScrollOffset % width != 0)
                                 ++col;
-                            pheight /= 2;
-                            col += (pheight / width);
+                            col += (pheight /2/ width);
                             if (pheight % width != 0)
                                 ++col;
                             col = (col * mSpanCount + mSpanCount / 2) / mToSpanCount;
                             int toOffset = col * toWidth - pheight;
-                            if (toOffset <= newTotalHeight - getVerticalSpace()) {
+                            if (toOffset <= newTotalHeight - pheight) {
                                 Log.d(TAG, "toOffset<=newTotalHeight-getVerticalSpace()");
                                 mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
                             } else {
