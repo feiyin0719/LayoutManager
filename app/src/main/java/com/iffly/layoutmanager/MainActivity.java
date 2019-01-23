@@ -23,19 +23,14 @@ public class MainActivity extends AppCompatActivity {
     private MyAdapter adapter;
     private CustomGridLayoutManager gridLayoutManager;
     private ScaleGestureDetector.OnScaleGestureListener onScaleGestureListener=new ScaleGestureDetector.OnScaleGestureListener() {
-        private float prev;
+        private float curScale;
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
-            Log.d("test","factor:"+detector.getScaleFactor());
-            if(detector.getScaleFactor()>1){
-                prev=detector.getScaleFactor();
-                gridLayoutManager.incChangeProcess();
-
-            }else if(detector.getScaleFactor()<1){
-
-                prev=detector.getScaleFactor();
-                gridLayoutManager.reduceChangeProcess();
-            }
+            float scale=detector.getScaleFactor();
+            curScale*=scale;
+            Log.d("test","factor:"+scale+" curScale:"+curScale);
+            int process=CustomGridLayoutManager.scaleToProcess(curScale);
+            gridLayoutManager.setSpanChangeProcess(process);
             return true;
         }
 
@@ -43,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
         public boolean onScaleBegin(ScaleGestureDetector detector) {
             Log.d("test","scale start");
             gridLayoutManager.startSpanChange();
+            curScale=1;
             return true;
         }
 
@@ -77,10 +73,10 @@ public class MainActivity extends AppCompatActivity {
                     public void run(){
                         int i=0;
                         gridLayoutManager.startSpanChange();
-                        while(i<=24){
-                            ++i;
+                        while(i<=200){
+                            i+=5;
                             try {
-                                Thread.sleep(50);
+                                Thread.sleep(10);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
@@ -88,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
                             recyclerView.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    gridLayoutManager.incChangeProcess();
+                                    gridLayoutManager.setSpanChangeProcess(finalI);
                                 }
                             });
                         }

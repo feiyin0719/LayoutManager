@@ -12,7 +12,7 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     private static final String TAG = "CustomGridLayoutManager";
 
-    public static final int MAX_SPAN_CHANGE_PROCESS = 50;
+    public static final int MAX_SPAN_CHANGE_PROCESS = 500;
     private SparseArray<Rect> itemRects = new SparseArray<>();
     private int mSpanCount;
     private int mToSpanCount;
@@ -55,6 +55,10 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     };
 
     public void setSpanChangeProcess(int spanChangeProcess) {
+        if (!isSpanChangeMode) {
+            Log.i(TAG, "must call in spanCountChange mode");
+            return;
+        }
         if (spanChangeProcess > MAX_SPAN_CHANGE_PROCESS)
             spanChangeProcess = MAX_SPAN_CHANGE_PROCESS;
         else if (spanChangeProcess < -MAX_SPAN_CHANGE_PROCESS)
@@ -74,6 +78,8 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             return;
         }
         this.mSpanChangeProcess++;
+        if (mSpanChangeProcess > MAX_SPAN_CHANGE_PROCESS)
+            mSpanChangeProcess = MAX_SPAN_CHANGE_PROCESS;
         Log.d(TAG, "spanChangeProcess:" + mSpanChangeProcess);
         updateSpanChangeProcess();
     }
@@ -84,7 +90,51 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             return;
         }
         this.mSpanChangeProcess--;
+        if (mSpanChangeProcess < MAX_SPAN_CHANGE_PROCESS)
+            mSpanChangeProcess = -MAX_SPAN_CHANGE_PROCESS;
         updateSpanChangeProcess();
+    }
+
+    private void calcOffset() {
+        if (verticalScrollOffset > 0) {
+            int width = getItemSize(mCachedBorders, mSpanCount);
+            int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
+            int count = getItemCount();
+            int newTotalHeight = count / mToSpanCount * toWidth;
+            if (count % mToSpanCount != 0)
+                newTotalHeight += toWidth;
+            int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
+
+            if (newTotalHeight <= pheight) {
+                Log.d(TAG, "newTotalHeight <= pheight");
+                mOffsetDelta = (0.0f - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+
+            } else {
+                Log.d(TAG, "newTotalHeight > pheight");
+                int col = (verticalScrollOffset+pheight/2) / width;
+                Log.d(TAG,"mid:"+(col * mSpanCount + mSpanCount / 2));
+                col = (col * mSpanCount + mSpanCount / 2) / mToSpanCount;
+
+                int toOffset = col * toWidth - pheight/2;
+                if (toOffset <= 0)
+                    mOffsetDelta = (0.0f - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+                else if (toOffset <= newTotalHeight - pheight) {
+                    Log.d(TAG, "toOffset<=newTotalHeight-getVerticalSpace()");
+                    mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+                } else {
+                    Log.d(TAG, "other");
+                    mOffsetDelta = (1.0f * newTotalHeight - pheight - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
+
+                }
+            }
+
+        } else {
+            Log.d(TAG, "0");
+            mOffsetDelta = 0;
+        }
+
+        Log.d(TAG, "mOffsetDelta : " + mOffsetDelta);
+
     }
 
     private void updateSpanChangeProcess() {
@@ -93,8 +143,11 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             return;
         }
         Log.d(TAG, "mSpanChangeProcess:" + this.mSpanChangeProcess);
-        if (this.mSpanChangeProcess == MAX_SPAN_CHANGE_PROCESS) {
-            mSpanCount += 2;
+        if (this.mSpanChangeProcess == MAX_SPAN_CHANGE_PROCESS||this.mSpanChangeProcess == -MAX_SPAN_CHANGE_PROCESS) {
+            if(this.mSpanChangeProcess==MAX_SPAN_CHANGE_PROCESS)
+                mSpanCount += 2;
+            else
+                mSpanCount-=2;
             mCachedBorders = null;
             mToCachedBorders = null;
             verticalScrollOffset = (int) (initOffset + mOffsetDelta * Math.abs(mSpanChangeProcess));
@@ -102,101 +155,29 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             isSpanChangeMode = false;
             Log.d(TAG, "verticalScrollOffset:" + verticalScrollOffset);
             calculateChildrenSite();
-        } else if (this.mSpanChangeProcess == -MAX_SPAN_CHANGE_PROCESS) {
-            mSpanCount -= 2;
-            mCachedBorders = null;
-            mToCachedBorders = null;
-            verticalScrollOffset = (int) (initOffset + mOffsetDelta * Math.abs(mSpanChangeProcess));
-            mSpanChangeProcess = 0;
-
-            isSpanChangeMode = false;
-            calculateChildrenSite();
-        } else {
+        }  else {
             if ((mSpanCount <= 2 && this.mSpanChangeProcess < 0) || (mSpanCount > 8 && this.mSpanChangeProcess > 0)) {
                 mSpanChangeProcess = 0;
                 isSpanChangeMode = false;
                 return;
             }
-            if (mSpanChangeProcess == 0)
+            if (mSpanChangeProcess == 0||(mToSpanCount-mSpanCount)*mSpanChangeProcess<=0)
                 mToCachedBorders = null;
             if (mToCachedBorders == null) {
-                initOffset = verticalScrollOffset;
                 if (mSpanChangeProcess > 0)
                     mToSpanCount = mSpanCount + 2;
                 else if (mSpanChangeProcess < 0)
                     mToSpanCount = mSpanCount - 2;
-
+                else {
+                    mToSpanCount = mSpanCount;
+                    return;
+                }
                 int totalSpace;
                 totalSpace = this.getWidth() - this.getPaddingRight() - this.getPaddingLeft();
                 mToCachedBorders = calculateItemBorders(mToCachedBorders, mToSpanCount, totalSpace);
                 //当发生偏移的时候，因为itemSize发生变化，为了显示当前画面，需要更新滑动距离
-                if (mSpanChangeProcess > 0) {
-                    Log.d(TAG, "mSpanChangeProcess > 0");
-                    if (verticalScrollOffset > 0) {
-                        int width = getItemSize(mCachedBorders, mSpanCount);
-                        int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
-                        int count = getItemCount();
-                        int newTotalHeight = count / mToSpanCount * toWidth;
-                        if (count % mToSpanCount != 0)
-                            newTotalHeight += toWidth;
-                        int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
-
-                        if (newTotalHeight <= pheight) {
-                            Log.d(TAG, "newTotalHeight <= pheight");
-                            mOffsetDelta = (0.0f - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
-
-                        } else {
-                            Log.d(TAG, "newTotalHeight > pheight");
-                            int col = (int) verticalScrollOffset / width;
-                            if (verticalScrollOffset % width != 0)
-                                ++col;
-                            col += (pheight /2/ width);
-                            if (pheight % width != 0)
-                                ++col;
-                            col = (col * mSpanCount + mSpanCount / 2) / mToSpanCount;
-                            int toOffset = col * toWidth - pheight;
-                            if (toOffset <= newTotalHeight - pheight) {
-                                Log.d(TAG, "toOffset<=newTotalHeight-getVerticalSpace()");
-                                mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
-                            } else {
-                                Log.d(TAG, "other");
-                                mOffsetDelta = (1.0f * newTotalHeight - pheight - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
-
-                            }
-                        }
-
-
-                    } else {
-                        Log.d(TAG, "0");
-                        mOffsetDelta = 0;
-                    }
-                } else if (mSpanChangeProcess < 0) {
-
-                    Log.d(TAG, "mSpanChangeProcess < 0");
-
-                    int width = getItemSize(mCachedBorders, mSpanCount);
-                    int toWidth = getItemSize(mToCachedBorders, mToSpanCount);
-                    int count = getItemCount();
-                    int newTotalHeight = count / mToSpanCount * toWidth;
-                    if (count % mToSpanCount != 0)
-                        newTotalHeight += toWidth;
-                    int pheight = getHeight() - getPaddingBottom() - getPaddingTop();
-                    int col = (int) verticalScrollOffset / width;
-                    if (verticalScrollOffset % width != 0)
-                        ++col;
-                    pheight /= 2;
-                    col += (pheight / width);
-                    if (pheight % width != 0)
-                        ++col;
-                    col = (col * mSpanCount + mSpanCount / 2) / mToSpanCount;
-                    int toOffset = col * toWidth - pheight;
-                    mOffsetDelta = (1.0f * toOffset - verticalScrollOffset) / MAX_SPAN_CHANGE_PROCESS;
-
-
-                }
-                Log.d(TAG, "mOffsetDelta : " + mOffsetDelta);
+                calcOffset();
             }
-
             //offsetChildrenVertical((int)(verticalScrollOffset+mOffsetDelta-verticalScrollOffset));
             verticalScrollOffset = (int) (initOffset + mOffsetDelta * Math.abs(mSpanChangeProcess));
             Log.d(TAG, "verticalScrollOffset : " + verticalScrollOffset);
@@ -207,6 +188,8 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     public void startSpanChange() {
         isSpanChangeMode = true;
         this.mSpanChangeProcess = 0;
+        initOffset = verticalScrollOffset;
+        mToSpanCount=mSpanCount;
     }
 
     public void stopSpanChange() {
@@ -220,7 +203,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
 
             }
             spanChangeAnim = ObjectAnimator.ofInt(this, "spanChangeProcess", mSpanChangeProcess, toProcess);
-            spanChangeAnim.setDuration(20 / (MAX_SPAN_CHANGE_PROCESS / 50) * Math.abs(mSpanChangeProcess - toProcess));
+            spanChangeAnim.setDuration(10 / (MAX_SPAN_CHANGE_PROCESS / 50) * Math.abs(mSpanChangeProcess - toProcess));
             spanChangeAnim.setInterpolator(new AccelerateDecelerateInterpolator());
             spanChangeAnim.start();
             spanChangeAnim.addListener(spanChangeListener);
@@ -417,13 +400,11 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private int getVerticalSpace() {
-
         return getHeight() - getPaddingBottom() - getPaddingTop();
     }
 
     @Override
     public boolean canScrollHorizontally() {
-
         return super.canScrollHorizontally();
     }
 
@@ -435,5 +416,13 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
 
     public int getHorizontalSpace() {
         return getWidth() - getPaddingLeft() - getPaddingRight();
+    }
+    public static int scaleToProcess(float scale){
+        if(scale==1)
+            return 0;
+        else if(scale>1){
+            return -(int)((scale-1)*100);
+        }else
+            return (int)((1-scale)*1000);
     }
 }
