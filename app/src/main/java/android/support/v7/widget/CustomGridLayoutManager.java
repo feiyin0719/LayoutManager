@@ -317,8 +317,12 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                 (int) verticalScrollOffset + getVerticalSpace());
         int left, top, width, toWidth = 0;
         width = getItemSize(mCachedBorders, mSpanCount);
-        if (mSpanChangeProcess != 0)
+        int w=width;
+        int process = Math.abs(mSpanChangeProcess);
+        if (mSpanChangeProcess != 0){
             toWidth = getItemSize(mToCachedBorders, mToSpanCount);
+            w = (int) (width + (1.0f * (toWidth - width) / MAX_SPAN_CHANGE_PROCESS) * process);
+        }
         Rect childRect = new Rect();
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
@@ -329,10 +333,8 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             if (mSpanChangeProcess != 0) {
                 left = mToCachedBorders[i % mToSpanCount];
                 top = i / mToSpanCount * toWidth;
-                int process = Math.abs(mSpanChangeProcess);
                 childRect.left = childRect.left + (int) (1.0f * (left - childRect.left) / MAX_SPAN_CHANGE_PROCESS * process);
                 childRect.top = childRect.top + (int) (1.0f * (top - childRect.top) / MAX_SPAN_CHANGE_PROCESS * process);
-                int w = (int) (width + (1.0f * (toWidth - width) / MAX_SPAN_CHANGE_PROCESS) * process);
                 childRect.right = childRect.left + w;
                 childRect.bottom = childRect.top + w;
             }
@@ -341,7 +343,16 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                 removeAndRecycleView(child, recycler);
             }
         }
-        for (int i = 0; i < getItemCount(); i++) {
+        boolean alreadyShow=false;
+        //只从当前显示区域上方开始判断
+        int showOffset =verticalScrollOffset-5*w;
+        if(showOffset<0)
+            showOffset=0;
+        if(mSpanChangeProcess!=0)
+            showOffset=showOffset/w*Math.min(mSpanCount,mToSpanCount);
+        else
+            showOffset=showOffset/w*mSpanCount;
+        for (int i = showOffset; i < getItemCount(); i++) {
             left=mCachedBorders[i%mSpanCount];
             top=i/mSpanCount*width;
             childRect = new Rect(left,top,left+width,top+width);
@@ -349,15 +360,14 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                 childRect = new Rect(childRect.left, childRect.top, childRect.right, childRect.bottom);
                 left = mToCachedBorders[i % mToSpanCount];
                 top = i / mToSpanCount * toWidth;
-                int process = Math.abs(mSpanChangeProcess);
                 childRect.left = childRect.left + (int) (1.0f * (left - childRect.left) / MAX_SPAN_CHANGE_PROCESS * process);
                 childRect.top = childRect.top + (int) (1.0f * (top - childRect.top) / MAX_SPAN_CHANGE_PROCESS * process);
-                int w = (int) (width + (1.0f * (toWidth - width) / MAX_SPAN_CHANGE_PROCESS) * process);
                 childRect.right = childRect.left + w;
                 childRect.bottom = childRect.top + w;
 
             }
             if (Rect.intersects(displayRect, childRect)) {
+                alreadyShow=true;
                 View itemView = recycler.getViewForPosition(i);
                 int spec = View.MeasureSpec.makeMeasureSpec(childRect.right - childRect.left, View.MeasureSpec.EXACTLY);
                 measureChildWithDecorationsAndMargin(itemView, spec, spec, false);
@@ -369,7 +379,8 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
                         childRect.top - (int) verticalScrollOffset,
                         childRect.right,
                         childRect.bottom - (int) verticalScrollOffset);
-            }
+            }else if(alreadyShow)
+                break;
         }
         Log.e(TAG, "itemCount = " + getChildCount());
     }
