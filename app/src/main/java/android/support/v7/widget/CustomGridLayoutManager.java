@@ -13,7 +13,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
     private static final String TAG = "CustomGridLayoutManager";
 
     public static final int MAX_SPAN_CHANGE_PROCESS = 500;
-    private SparseArray<Rect> itemRects = new SparseArray<>();
+    //private SparseArray<Rect> itemRects = new SparseArray<>();
     private int mSpanCount;
     private int mToSpanCount;
     public int totalHeight = 0;
@@ -276,19 +276,22 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
         totalSpace = getItemSize(mCachedBorders, mSpanCount);
         Log.i(TAG, "totalSpace:" + totalSpace);
 
-        for (int i = 0; i < getItemCount(); i++) {
-            Rect rect = itemRects.get(i);
-            if (rect == null) {
-                rect = new Rect();
-            }
-            if (i % mSpanCount == 0 && i > 0)
-                totalHeight += totalSpace;
-            rect.set(mCachedBorders[i % mSpanCount], totalHeight, mCachedBorders[i % mSpanCount] + totalSpace, totalHeight + totalSpace);
-            // 保存ItemView的位置信息
-            itemRects.put(i, rect);
-
-        }
-        totalHeight += totalSpace;
+//        for (int i = 0; i < getItemCount(); i++) {
+//            Rect rect = itemRects.get(i);
+//            if (rect == null) {
+//                rect = new Rect();
+//            }
+//            if (i % mSpanCount == 0 && i > 0)
+//                totalHeight += totalSpace;
+//            rect.set(mCachedBorders[i % mSpanCount], totalHeight, mCachedBorders[i % mSpanCount] + totalSpace, totalHeight + totalSpace);
+//            // 保存ItemView的位置信息
+//            itemRects.put(i, rect);
+//
+//        }
+        int count=getItemCount();
+        totalHeight =count/mSpanCount*totalSpace;
+        if(count%mSpanCount!=0)
+            totalHeight+=totalSpace;
         Log.d(TAG, "totalHeight:" + totalHeight);
     }
 
@@ -339,7 +342,9 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
             }
         }
         for (int i = 0; i < getItemCount(); i++) {
-            childRect = itemRects.get(i);
+            left=mCachedBorders[i%mSpanCount];
+            top=i/mSpanCount*width;
+            childRect = new Rect(left,top,left+width,top+width);
             if (mSpanChangeProcess != 0) {
                 childRect = new Rect(childRect.left, childRect.top, childRect.right, childRect.bottom);
                 left = mToCachedBorders[i % mToSpanCount];
