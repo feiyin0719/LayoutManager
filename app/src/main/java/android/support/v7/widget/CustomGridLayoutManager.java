@@ -437,7 +437,7 @@ public class CustomGridLayoutManager extends RecyclerView.LayoutManager {
         if(scale==1)
             return 0;
         else if(scale>1){
-            return -(int)((scale-1)*100);
+            return -(int)((scale-1)*200);
         }else
             return (int)((1-scale)*1000);
     }
